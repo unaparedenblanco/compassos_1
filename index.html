@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Juego de Duración Musical</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+    /* Simple fade-in animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-out forwards;
+    }
+    /* Custom scrollbar for figure selection */
+    .overflow-x-auto::-webkit-scrollbar {
+      height: 8px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 10px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-thumb {
+      background: #9ca3af;
+      border-radius: 10px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+      background: #6b7280;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-b from-blue-50 to-indigo-100 min-h-screen flex flex-col">
+  <div id="root" class="flex-grow flex flex-col"></div>
+  <footer class="text-center p-4 text-gray-500 text-sm">
+    Creat per Miguel Castellá Viciano
+  </footer>
+
+  <script type="module">
+    const rootElement = document.getElementById('root');
+
+    // --- DATA & CONSTANTS ---
+    const figuresMusicals = [
+      { id: "whole", nom: "Redona", simbol: "𝅝", duracio: 4, tipus: "nota" },
+      { id: "whole-rest", nom: "Silenci de redona", simbol: "𝄻", duracio: 4, tipus: "silenci" },
+      { id: "half", nom: "Blanca", simbol: "𝅗𝅥", duracio: 2, tipus: "nota" },
+      { id: "half-rest", nom: "Silenci de blanca", simbol: "𝄼", duracio: 2, tipus: "silenci" },
+      { id: "quarter", nom: "Negra", simbol: "𝅘𝅥", duracio: 1, tipus: "nota" },
+      { id: "quarter-rest", nom: "Silenci de negra", simbol: "𝄽", duracio: 1, tipus: "silenci" },
+      { id: "eighth", nom: "Corxera", simbol: "𝅘𝅥𝅮", duracio: 0.5, tipus: "nota" },
+      { id: "eighth-rest", nom: "Silenci de corxera", simbol: "𝄾", duracio: 0.5, tipus: "silenci" },
+    ];
+
+    // --- STATE MANAGEMENT ---
+    let state = {
+      vistaActual: "inici",
+      figuresSeleccionades: {
+        whole: true, "whole-rest": true, half: true, "half-rest": true, quarter: true,
+        "quarter-rest": true, eighth: true, "eighth-rest": true,
+      },
+      estatJoc: {
+        preguntaActual: 0, puntuacio: 0, respostes: [],
+      },
+      seqüencia: [],
+      duracioCorrecta: '',
+      retroalimentacio: { esCorrecta: null, missatge: "" },
+    };
+
+    // --- ICONS ---
+    const icons = {
+      Music4: `<svg class="h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><path d="m9 9 12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`,
+      Play: `<svg class="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+      Settings: `<svg class="h-8 w-8" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
+      RotateCcw: `<svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`,
+      Trophy: (className) => `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>`,
+      XCircle: (className) => `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
+      Check: (className) => `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+      X: (className) => `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+    };
+    
+    // --- CONTROLLERS ---
+    window.comencarRepte = () => {
+      state.vistaActual = "configuracio";
+      render();
+    };
+
+    window.iniciarJoc = () => {
+      const hiHaFiguresSeleccionades = Object.values(state.figuresSeleccionades).some(s => s);
+      if (hiHaFiguresSeleccionades) {
+        state.estatJoc = { preguntaActual: 0, puntuacio: 0, respostes: [] };
+        state.vistaActual = "joc";
+        generarExercici();
+        render();
+      }
+    };
+
+    window.tornarAConfiguracio = () => {
+      state.vistaActual = "configuracio";
+      render();
+    };
+
+    window.canviFigura = (id) => {
+      state.figuresSeleccionades[id] = !state.figuresSeleccionades[id];
+      render();
+    };
+
+    window.comprovarResposta = (respostaUsuari) => {
+      const buttons = document.querySelectorAll('.answer-button');
+      buttons.forEach(button => button.disabled = true);
+
+      const esCorrecta = respostaUsuari === state.duracioCorrecta;
+      state.retroalimentacio = {
+        esCorrecta,
+        missatge: esCorrecta ? "¡Correcte! 🎉" : `Incorrecte. La resposta correcta és ${state.duracioCorrecta}`
+      };
+      render();
+
+      setTimeout(() => {
+        const novesRespostes = [
+          ...state.estatJoc.respostes,
+          {
+            pregunta: state.seqüencia.map(item => item.figura.simbol).join(" + "),
+            correcta: state.duracioCorrecta,
+            usuari: respostaUsuari,
+            esCorrecta
+          }
+        ];
+        
+        const novaPuntuacio = esCorrecta ? state.estatJoc.puntuacio + 1 : state.estatJoc.puntuacio;
+
+        if (state.estatJoc.preguntaActual < 9) {
+          state.estatJoc = {
+            preguntaActual: state.estatJoc.preguntaActual + 1,
+            puntuacio: novaPuntuacio,
+            respostes: novesRespostes,
+          };
+          generarExercici();
+        } else {
+          state.estatJoc = { ...state.estatJoc, puntuacio: novaPuntuacio, respostes: novesRespostes };
+          state.vistaActual = "resultats";
+        }
+        render();
+      }, 1500);
+    };
+
+    const generarExercici = () => {
+        const figuresActives = figuresMusicals.filter(figura => state.figuresSeleccionades[figura.id]);
+        if (figuresActives.length === 0) return;
+
+        let novaSeqüencia = [];
+        let targetDuration;
+        let attempts = 0;
+
+        while (attempts < 100) {
+            attempts++;
+            novaSeqüencia = [];
+            const targetOptions = [2, 3, 4];
+            targetDuration = targetOptions[Math.floor(Math.random() * targetOptions.length)];
+            let remainingDuration = targetDuration;
+            
+            let generationAttempts = 0;
+            while (remainingDuration > 0 && generationAttempts < 20) {
+                generationAttempts++;
+                const possibleFigures = figuresActives.filter(f => f.duracio <= remainingDuration);
+                
+                if (possibleFigures.length === 0) break;
+                
+                const figuraEscollida = possibleFigures[Math.floor(Math.random() * possibleFigures.length)];
+                novaSeqüencia.push({ figura: figuraEscollida });
+                remainingDuration -= figuraEscollida.duracio;
+            }
+
+            if (remainingDuration === 0 && novaSeqüencia.length > 0) break;
+        }
+
+        if (novaSeqüencia.length === 0 || attempts >= 100) {
+            targetDuration = 2;
+            const halfNote = figuresMusicals.find(f => f.id === 'half') || figuresActives[0];
+            novaSeqüencia = [{figura: halfNote }];
+        }
+        
+        state.seqüencia = novaSeqüencia;
+        state.duracioCorrecta = `${targetDuration}/4`;
+        state.retroalimentacio = { esCorrecta: null, missatge: "" };
+    };
+
+    // --- RENDER FUNCTIONS ---
+
+    function renderInici() {
+      return `
+        <div class="w-full max-w-lg shadow-xl animate-fade-in text-center rounded-xl border border-gray-200 bg-white text-gray-900">
+          <div class="flex flex-col space-y-1.5 p-6">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-indigo-100 mb-4">
+              ${icons.Music4}
+            </div>
+            <h3 class="text-4xl font-bold text-indigo-800 tracking-tight leading-tight">
+              COMPASSOS
+            </h3>
+            <p class="text-gray-500 text-lg mt-2">V.1</p>
+          </div>
+          <div class="p-6 pt-0">
+            <div class="flex justify-center pt-4">
+              <button onclick="comencarRepte()" class="py-6 text-xl px-10 h-12 rounded-md inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700">
+                COMENÇAR
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderConfiguracio() {
+      const notes = figuresMusicals.filter(figura => figura.tipus === 'nota');
+      const silencis = figuresMusicals.filter(figura => figura.tipus === 'silenci');
+      
+      const renderFigureSelector = (figura) => `
+        <div
+          onclick="canviFigura('${figura.id}')"
+          class="flex-shrink-0 w-24 h-36 flex flex-col items-center justify-between p-2 rounded-lg border-2 cursor-pointer transition-all ${
+            state.figuresSeleccionades[figura.id]
+              ? "border-indigo-500 bg-indigo-50 shadow-md"
+              : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+          }">
+          <span class="text-5xl h-16 flex items-center">${figura.simbol}</span>
+          <div class="text-center">
+            <span class="block text-xs font-medium text-gray-800">${figura.nom}</span>
+            <span class="block text-[11px] text-gray-500">${figura.duracio} temps</span>
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="w-full max-w-4xl shadow-xl animate-fade-in rounded-xl border border-gray-200 bg-white text-gray-900">
+          <div class="flex flex-col space-y-1.5 p-4 text-center">
+            <h3 class="text-3xl font-bold text-indigo-800 flex items-center justify-center gap-2 text-2xl font-semibold leading-none tracking-tight">
+              ${icons.Settings}
+              Configuració del Joc
+            </h3>
+            <p class="text-sm text-gray-500">Selecciona les figures musicals que vols practicar</p>
+          </div>
+          <div class="p-4 pt-2 space-y-4">
+            <div class="space-y-3">
+              <div>
+                <h2 class="text-xl font-semibold text-center text-gray-700 mb-2">Notes Musicals</h2>
+                <div class="flex justify-center space-x-3 overflow-x-auto pb-3 px-2">
+                  ${notes.map(renderFigureSelector).join('')}
+                </div>
+              </div>
+              <div>
+                <h2 class="text-xl font-semibold text-center text-gray-700 mb-2">Silencis</h2>
+                <div class="flex justify-center space-x-3 overflow-x-auto pb-3 px-2">
+                  ${silencis.map(renderFigureSelector).join('')}
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-center pt-2">
+              <button onclick="iniciarJoc()" class="py-6 text-lg px-8 h-12 rounded-md inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700">
+                ${icons.Play}
+                Començar Joc (10 preguntes)
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderJoc() {
+       if (Object.values(state.figuresSeleccionades).filter(v => v).length === 0) {
+        return `
+          <div class="w-full max-w-md shadow-xl text-center rounded-xl border border-gray-200 bg-white text-gray-900">
+            <div class="flex flex-col space-y-1.5 p-6">
+              <h3 class="text-2xl font-bold text-red-600 font-semibold leading-none tracking-tight">Error de Configuració</h3>
+            </div>
+            <div class="p-6 pt-0">
+              <p class="text-gray-600 mb-6">No has seleccionat cap figura musical per practicar.</p>
+              <button onclick="tornarAConfiguracio()" class="h-10 px-4 py-2 inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700">
+                Tornar a Configuració
+              </button>
+            </div>
+          </div>`;
+      }
+
+      const { preguntaActual, puntuacio } = state.estatJoc;
+      const { esCorrecta, missatge } = state.retroalimentacio;
+
+      return `
+        <div class="w-full max-w-3xl shadow-xl rounded-xl border border-gray-200 bg-white text-gray-900 animate-fade-in">
+          <div class="flex flex-col space-y-1.5 p-4 text-center">
+            <h3 class="text-3xl font-bold text-indigo-800 text-2xl font-semibold leading-none tracking-tight">Joc de Compassos Musicals</h3>
+            <div class="flex justify-between items-center mt-2 text-gray-700">
+              <div class="text-lg font-medium">Pregunta ${preguntaActual + 1} de 10</div>
+              <div class="text-lg font-medium">Encerts: ${puntuacio}</div>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+              <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: ${((preguntaActual + 1) / 10) * 100}%"></div>
+            </div>
+          </div>
+          <div class="space-y-6 p-4 pt-2">
+            <div class="space-y-4">
+              <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
+                <h2 class="text-lg font-semibold text-center mb-2 text-gray-800">A quin compàs correspon la suma?</h2>
+                <div class="flex flex-wrap items-center justify-center gap-2 min-h-[80px]">
+                  ${state.seqüencia.map((item, index) => `
+                    <div class="flex items-center">
+                      <span class="text-5xl">${item.figura.simbol}</span>
+                      ${index < state.seqüencia.length - 1 ? `<span class="text-3xl mx-2 text-gray-400">+</span>` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+              <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+                  <button
+                    onclick="comprovarResposta('2/4')"
+                    class="answer-button w-full sm:w-32 text-2xl h-16 rounded-lg px-8 inline-flex items-center justify-center font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-sky-500 text-white hover:bg-sky-600"
+                    ${esCorrecta !== null ? 'disabled' : ''}
+                  >2/4</button>
+                  <button
+                    onclick="comprovarResposta('3/4')"
+                    class="answer-button w-full sm:w-32 text-2xl h-16 rounded-lg px-8 inline-flex items-center justify-center font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-violet-500 text-white hover:bg-violet-600"
+                    ${esCorrecta !== null ? 'disabled' : ''}
+                  >3/4</button>
+                  <button
+                    onclick="comprovarResposta('4/4')"
+                    class="answer-button w-full sm:w-32 text-2xl h-16 rounded-lg px-8 inline-flex items-center justify-center font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-teal-500 text-white hover:bg-teal-600"
+                    ${esCorrecta !== null ? 'disabled' : ''}
+                  >4/4</button>
+              </div>
+              ${esCorrecta !== null ? `
+                <div class="p-4 rounded-lg text-center font-medium ${esCorrecta ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">
+                  ${missatge}
+                </div>` : ''
+              }
+            </div>
+            <div class="flex justify-center pt-2">
+              <button onclick="tornarAConfiguracio()" class="flex items-center gap-2 h-10 px-4 py-2 inline-flex justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-300">
+                ${icons.RotateCcw}
+                Canviar Configuració
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderResultats() {
+      const { respostes, puntuacio } = state.estatJoc;
+      const percentatge = Math.round((puntuacio / respostes.length) * 100) || 0;
+      
+      let missatge, color;
+      if (percentatge >= 90) { missatge = "¡Excel·lent! Ets un mestre del ritme"; color = "text-green-600"; }
+      else if (percentatge >= 70) { missatge = "¡Molt bé! Tens un gran sentit rítmic"; color = "text-blue-600"; }
+      else if (percentatge >= 50) { missatge = "¡Bona feina! Segueix practicant"; color = "text-yellow-600"; }
+      else { missatge = "Segueix practicant, milloraràs amb el temps"; color = "text-red-600"; }
+
+      return `
+        <div class="w-full max-w-3xl shadow-xl rounded-xl border border-gray-200 bg-white text-gray-900 animate-fade-in">
+          <div class="flex flex-col space-y-1.5 p-6 text-center">
+            <h3 class="text-3xl font-bold text-indigo-800 flex items-center justify-center gap-2 text-2xl font-semibold leading-none tracking-tight">
+              ${percentatge >= 70 ? icons.Trophy('h-8 w-8 text-yellow-500') : icons.XCircle('h-8 w-8 text-red-500')}
+              Resultats del Joc
+            </h3>
+            <p class="text-gray-500">Has completat ${respostes.length} preguntes sobre duració musical</p>
+          </div>
+          <div class="p-6 pt-0 space-y-8">
+            <div class="text-center p-6 bg-gray-50 rounded-lg">
+              <div class="text-6xl font-bold text-indigo-700 mb-2">
+                ${puntuacio}<span class="text-2xl text-gray-400">/${respostes.length}</span>
+              </div>
+              <div class="text-2xl font-semibold ${color}">${percentatge}% - ${missatge}</div>
+            </div>
+            <div class="space-y-4">
+              <h3 class="text-xl font-semibold text-center text-gray-700">Resum de Respostes</h3>
+              <div class="max-h-80 overflow-y-auto space-y-2 p-2 bg-gray-50 rounded-md border">
+                ${respostes.map((resposta, index) => `
+                  <div class="p-3 rounded-lg flex flex-col sm:flex-row justify-between items-center ${resposta.esCorrecta ? "bg-green-100" : "bg-red-100"}">
+                    <div class="flex items-center gap-4">
+                      <div class="font-medium text-gray-600">P${index + 1}:</div>
+                      <div class="text-2xl tracking-wider">${resposta.pregunta}</div>
+                    </div>
+                    <div class="text-sm flex items-center gap-4 mt-2 sm:mt-0 text-gray-700">
+                      <div>La teua: <span class="font-bold">${resposta.usuari ?? "N/A"}</span></div>
+                      ${!resposta.esCorrecta ? `<div>Correcta: <span class="font-bold">${resposta.correcta}</span></div>` : ''}
+                      ${resposta.esCorrecta ? icons.Check('h-5 w-5 text-green-600 flex-shrink-0') : icons.X('h-5 w-5 text-red-600 flex-shrink-0')}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+              <button onclick="iniciarJoc()" class="py-6 text-lg h-12 rounded-md px-8 inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700">
+                ${icons.Play} Jugar Una Altra Vez
+              </button>
+              <button onclick="tornarAConfiguracio()" class="py-6 text-lg h-12 rounded-md px-8 inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-300">
+                <svg class="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                Canviar Configuració
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- MAIN RENDERER ---
+    function render() {
+      let content = '';
+      const mainContainer = document.createElement('main');
+      mainContainer.className = "flex-grow p-4 sm:p-6 md:p-8 flex items-center justify-center";
+
+      switch (state.vistaActual) {
+        case "inici": content = renderInici(); break;
+        case "configuracio": content = renderConfiguracio(); break;
+        case "joc": content = renderJoc(); break;
+        case "resultats": content = renderResultats(); break;
+      }
+      mainContainer.innerHTML = content;
+      rootElement.innerHTML = '';
+      rootElement.appendChild(mainContainer);
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
